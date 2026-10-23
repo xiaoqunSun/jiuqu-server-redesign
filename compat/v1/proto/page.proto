@@ -1,0 +1,81 @@
+message _vec2 {
+	required int32 x = 1;
+	required int32 y = 2;
+	optional int32 id = 3;
+}
+message _style {
+	required int32 	id = 1;
+	optional bytes 	brushColor = 2;
+	optional int32 	brushSize = 3;
+	optional int32 	fontSize = 4;
+	optional bool 	fontBold = 5;
+	optional bool 	fontItalic = 6;
+}
+message _node {
+	required int32 	id = 1;
+	optional int32 	type = 2;
+	optional int32 styleId = 3;
+
+	optional _vec2 	position = 4;
+	optional _vec2 	size = 5;
+	optional int32 	priority = 6;
+	//line node
+	optional _vec2 	startAnchor = 7;
+	//pen node
+	repeated _vec2 	userPoints = 8;
+	repeated _vec2 	simplifyPoints = 9;
+	//text node
+	optional bytes 	text = 10;
+	optional int32 	isEditing = 11;
+	
+	//imageUrl node
+	optional bytes 	imageUrl = 12;
+	optional int32 	rotation = 13;
+}
+
+message pageCopy_Request {
+	required int32 	from = 1;
+	required int32 	to = 2;
+}	
+message pageCopy_Response {
+	required int32 	from = 1;
+	required int32 	to = 2;
+	required bytes 	senderId = 3;
+}
+message pageUpdate_Request {
+	required int32 	pageId = 1;
+	repeated _node  nodes = 2;
+	repeated int32 	nodesDeleted = 3;
+}
+
+message pageUpdate_Response {
+	required int32 	pageId = 1;
+	required bytes 	senderId = 2;
+
+	repeated _node  nodes = 3;
+	repeated int32 	nodesDeleted = 4;
+}
+
+message _page {
+	repeated _node  nodes = 1;
+}
+message pageQuery_Request {
+	required int32 pageId = 1;
+}	
+
+message pageQuery_Response {
+	required int32  pageId = 1;
+	required _page 	page = 2;    	
+}	
+
+message styleAdd_Request {
+	required _style style = 1;
+}
+message styleAdd_Response {
+	required _style style = 1;
+}   
+message styleQuery_Request {
+}
+message styleQuery_Response {
+	repeated _style styles = 1;
+}

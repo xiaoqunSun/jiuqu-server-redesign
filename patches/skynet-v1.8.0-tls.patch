@@ -1,0 +1,191 @@
+diff --git a/lualib-src/ltls.c b/lualib-src/ltls.c
+index 3fd4a0a..af94006 100644
+--- a/lualib-src/ltls.c
++++ b/lualib-src/ltls.c
+@@ -5,6 +5,7 @@
+ #include <openssl/err.h>
+ #include <openssl/dh.h>
+ #include <openssl/ssl.h>
++#include <openssl/x509_vfy.h>
+ #include <openssl/conf.h>
+ #include <openssl/engine.h>
+ #include <lua.h>
+@@ -25,6 +26,8 @@ struct ssl_ctx {
+     SSL_CTX* ctx;
+ };
+ 
++static bool _is_ipv4_literal(const char* host);
++
+ // static int
+ // _ssl_verify_peer(int ok, X509_STORE_CTX* ctx) {
+ //     return 1;
+@@ -272,7 +275,13 @@ _lset_ext_host_name(lua_State* L) {
+     struct tls_context* tls_p = _check_context(L, 1);
+     size_t slen = 0;
+     char* host = (char*)lua_tolstring(L, 2, &slen);
++    if(!host) return 0;
++    if(_is_ipv4_literal(host)) {
++        lua_pushinteger(L, 1);
++        return 1;
++    }
+     int ret = SSL_set_tlsext_host_name(tls_p->ssl, host);
++    if(ret != 1) luaL_error(L, "SSL_set_tlsext_host_name failed");
+     lua_pushinteger(L, ret);
+     return 1;
+ }
+@@ -316,6 +325,33 @@ _lctx_cert(lua_State* L) {
+     return 0;
+ }
+ 
++static bool
++_is_ipv4_literal(const char* host) {
++    bool has_dot = false;
++    if(!host || !*host) return false;
++    for(const char* p = host; *p; ++p) {
++        if(*p == '.') {
++            has_dot = true;
++        } else if(*p < '0' || *p > '9') {
++            return false;
++        }
++    }
++    return has_dot;
++}
++
++static int
++_lctx_verify_peer(lua_State* L) {
++    struct ssl_ctx* ctx_p = _check_sslctx(L, 1);
++    if(SSL_CTX_set_default_verify_paths(ctx_p->ctx) != 1) {
++        luaL_error(L, "SSL_CTX_set_default_verify_paths failed");
++    }
++    if(SSL_CTX_set_min_proto_version(ctx_p->ctx, TLS1_2_VERSION) != 1) {
++        luaL_error(L, "SSL_CTX_set_min_proto_version failed");
++    }
++    SSL_CTX_set_verify(ctx_p->ctx, SSL_VERIFY_PEER, NULL);
++    return 0;
++}
++
+ static int
+ _lctx_ciphers(lua_State* L) {
+     struct ssl_ctx* ctx_p = _check_sslctx(L, 1);
+@@ -346,6 +382,7 @@ lnew_ctx(lua_State* L) {
+         luaL_Reg l[] = {
+             {"set_ciphers", _lctx_ciphers},
+             {"set_cert", _lctx_cert},
++            {"set_verify_peer", _lctx_verify_peer},
+             {NULL, NULL},
+         };
+ 
+@@ -372,7 +409,18 @@ lnew_tls(lua_State* L) {
+         _init_client_context(L, tls_p, ctx_p);
+         if (!lua_isnoneornil(L, 3)) {
+             const char* hostname = luaL_checkstring(L, 3);
+-            SSL_set_tlsext_host_name(tls_p->ssl, hostname);
++            if(_is_ipv4_literal(hostname)) {
++                if(X509_VERIFY_PARAM_set1_ip_asc(SSL_get0_param(tls_p->ssl), hostname) != 1) {
++                    luaL_error(L, "invalid TLS peer IP address");
++                }
++            } else {
++                if(SSL_set1_host(tls_p->ssl, hostname) != 1) {
++                    luaL_error(L, "SSL_set1_host failed");
++                }
++                if(SSL_set_tlsext_host_name(tls_p->ssl, hostname) != 1) {
++                    luaL_error(L, "SSL_set_tlsext_host_name failed");
++                }
++            }
+         }
+     }else if(strcmp(method, "server") == 0) {
+         _init_server_context(L, tls_p, ctx_p);
+diff --git a/lualib/http/httpc.lua b/lualib/http/httpc.lua
+index 057aa61..d4a714e 100644
+--- a/lualib/http/httpc.lua
++++ b/lualib/http/httpc.lua
+@@ -51,7 +51,7 @@ local function gen_interface(protocol, fd, hostname)
+ 		}
+ 	elseif protocol == "https" then
+ 		local tls = require "http.tlshelper"
+-		SSLCTX_CLIENT = SSLCTX_CLIENT or tls.newctx()
++		SSLCTX_CLIENT = SSLCTX_CLIENT or tls.newctx(true)
+ 		local tls_ctx = tls.newtls("client", SSLCTX_CLIENT, hostname)
+ 		return {
+ 			init = tls.init_requestfunc(fd, tls_ctx),
+@@ -74,12 +74,10 @@ local function connect(host, timeout)
+ 	else
+ 		port = tonumber(port)
+ 	end
+-	local hostname
+-	if not hostaddr:match(".*%d+$") then
+-		hostname = hostaddr
+-		if async_dns then
+-			hostaddr = dns.resolve(hostname)
+-		end
++	local hostname = hostaddr
++	local is_ipv4 = hostaddr:match("^%d+%.%d+%.%d+%.%d+$") ~= nil
++	if async_dns and not is_ipv4 then
++		hostaddr = dns.resolve(hostname)
+ 	end
+ 	local fd = socket.connect(hostaddr, port, timeout)
+ 	if not fd then
+@@ -95,7 +93,7 @@ local function connect(host, timeout)
+ 		end)
+ 	end
+ 	if interface.init then
+-		interface.init(host)
++		interface.init(hostname)
+ 	end
+ 	return fd, interface, host
+ end
+diff --git a/lualib/http/tlshelper.lua b/lualib/http/tlshelper.lua
+index a81405c..e6a0767 100644
+--- a/lualib/http/tlshelper.lua
++++ b/lualib/http/tlshelper.lua
+@@ -7,7 +7,7 @@ function tlshelper.init_requestfunc(fd, tls_ctx)
+     local readfunc = socket.readfunc(fd)
+     local writefunc = socket.writefunc(fd)
+     return function (hostname)
+-        tls_ctx:set_ext_host_name(hostname)
++        if hostname then tls_ctx:set_ext_host_name(hostname) end
+         local ds1 = tls_ctx:handshake()
+         writefunc(ds1)
+         while not tls_ctx:finished() do
+@@ -88,8 +88,10 @@ function tlshelper.readallfunc(fd, tls_ctx)
+     end
+ end
+ 
+-function tlshelper.newctx()
+-    return c.newctx()
++function tlshelper.newctx(verify_peer)
++    local ctx = c.newctx()
++    if verify_peer then ctx:set_verify_peer() end
++    return ctx
+ end
+ 
+ function tlshelper.newtls(method, ssl_ctx, hostname)
+diff --git a/lualib/http/websocket.lua b/lualib/http/websocket.lua
+index 8279c7d..cb99648 100755
+--- a/lualib/http/websocket.lua
++++ b/lualib/http/websocket.lua
+@@ -352,10 +352,10 @@ local function _new_client_ws(socket_id, protocol, hostname)
+         }
+     elseif protocol == "wss" then
+         local tls = require "http.tlshelper"
+-        SSLCTX_CLIENT = SSLCTX_CLIENT or tls.newctx()
++        SSLCTX_CLIENT = SSLCTX_CLIENT or tls.newctx(true)
+         local tls_ctx = tls.newtls("client", SSLCTX_CLIENT, hostname)
+         local init = tls.init_requestfunc(socket_id, tls_ctx)
+-        init()
++        init(hostname)
+         obj = {
+             close = function ()
+                 socket.close(socket_id)
+@@ -482,10 +482,7 @@ function M.connect(url, header, timeout)
+     if host_port == "" then
+         host_port = protocol == "ws" and 80 or 443
+     end
+-    local hostname
+-    if not host_addr:match(".*%d+$") then
+-        hostname = host_addr
+-    end
++    local hostname = host_addr
+ 
+     uri = uri == "" and "/" or uri
+     local socket_id = sockethelper.connect(host_addr, host_port, timeout)

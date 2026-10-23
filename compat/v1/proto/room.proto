@@ -1,0 +1,151 @@
+
+message onMemEnterRoom{
+	optional bytes id = 1;
+}
+message onMemLeaveRoom{
+	optional bytes id = 1;
+}
+
+message _roomInfo
+{
+	message _var{
+		required bytes name = 1;
+		required bytes var = 2;	
+	}
+
+	repeated bytes studentID = 1;
+	repeated _var vars = 2;
+}
+
+message chatListen_Request {
+	repeated bytes channels = 1;
+}
+message chatUnlisten_Request {
+	repeated bytes channels = 1;
+}
+message chatSend_Request {
+	repeated bytes channels = 1;
+	required bytes text = 2;
+	optional bool saveToReplay = 3;
+	optional bool disableWordsFilter = 4;
+}
+message chatRecv_Response {
+	required bytes sender = 1;
+	required bytes channel = 2;
+	required bytes text = 3;
+}
+message chatHistory_Request {
+	required bytes channel = 1;
+	optional int32 count = 2;
+}
+message chatHistory_Response {
+	message _record {
+		required uint64 timestamp = 1;
+		required bytes sender = 2;
+		required bytes text = 3;
+	}
+	required bytes channel = 1;
+	repeated _record records = 2;
+}
+
+message updateVar_Request{
+	required bytes name = 1;
+	required bytes var = 2;
+	optional bool onlyToMaster = 3;
+}
+
+message updateVar_Response{
+	required bytes name = 1;
+	required bytes var = 2;
+}
+
+message event_Request{
+	required int32 id = 1;
+	required bytes var = 2;
+	optional bool clean = 3;
+	optional bool newGame = 4;
+}
+
+message event_Response{
+	required int32 id = 1;
+	required bytes var = 2;
+}
+
+message updateCursorPosition_Request{
+	required int32 x = 1;
+	required int32 y = 2;
+	required int32 type = 3;
+	optional bytes sender = 4;
+}
+
+message updateCursorPosition_Response{
+	required int32 x = 1;
+	required int32 y = 2;
+	required int32 type = 3;
+	optional bytes sender = 4;
+}
+
+
+message saveRoomData_Request{
+	required bytes data = 1	;
+}
+
+message subRoomVar_Request{
+	required int32 subRoom = 1;
+	required bytes keys = 2;
+}
+
+message subRoomVar_Response{
+	required int32 subRoom = 1;
+	required bytes keys = 2;
+	required bytes var = 3;
+}
+
+message updateExtVar_Request{
+	required bytes name = 1;
+	required bytes var = 2;
+	required bool varIsTable = 3;
+	required bool isMerge = 4;
+	optional bool isBoradcast = 5; //废弃
+	optional bool onlyToMaster = 6;
+}
+
+message updateExtVar_Response{
+	required bytes name = 1;
+	required bytes var = 2;
+	required bool varIsTable = 3;
+	required bool isMerge = 4;
+	optional bytes sender = 5;
+}
+message queryExtVar_Request{
+	required bytes name = 1;
+}
+
+message queryExtVar_Response{
+	required bytes name = 1;
+	required bytes var = 2;
+}
+
+
+message addVar_Request{
+	required bytes name = 1;
+	required int32 count = 2;
+	optional int32 clampMin = 3;
+	optional int32 clampMax = 4;
+}
+
+message addVar_Response{
+	required bytes name = 1;
+	required int32 value = 2;
+}
+
+
+message servertime_Request{
+	required int32 client = 1;
+}
+
+message servertime_Response
+{
+	required int32 client = 1;
+	required int32 server = 2;
+}

@@ -1,0 +1,23 @@
+import "room.proto";
+
+message loginRequest
+{
+	optional bytes id = 1;
+	optional bytes room = 2;
+	repeated bytes subRoom = 3;
+    optional bytes rootRoom = 4;
+	optional bytes accessToken = 5;
+	optional bool isMaster = 6;
+}
+
+
+message loginResponse
+{
+	optional bool hasRoomData = 1;
+	optional _roomInfo roominfo = 2;
+	optional int32 index = 3;
+	optional int32 error = 4;
+}
+
+message kickOut{
+}

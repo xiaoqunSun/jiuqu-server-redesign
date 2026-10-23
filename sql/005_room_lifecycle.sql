@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS room_lifecycle (
+    room_id VARBINARY(191) NOT NULL,
+    is_closed TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    updated_ts BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (room_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

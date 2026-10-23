@@ -1,0 +1,87 @@
+
+
+// 投票选项
+message _voteOption {
+    required int32 id = 1;           // 选项ID
+    required bytes text = 2; // 选项文本
+}
+
+
+// 投票结果
+message _voteResult {
+    required int32 id = 1;                   // 投票ID
+    required int32 total_votes = 2;          // 总投票数
+    repeated _voteOptionResult option_results = 3;  // 各选项结果
+    repeated _voteDetailResult detail_results = 4;
+}
+
+// 选项结果统计
+message _voteOptionResult {
+    required int32 id = 1;           // 选项ID
+    required int32 vote_count = 2;   // 得票数
+    required float percentage = 3;   // 得票百分比
+}
+message _voteDetailResult {
+    required bytes player_id = 1;
+    repeated int32 option_ids = 2;  
+}
+
+message _voteInfo {
+    required int32 id = 1;      
+    required bool allow_multiple = 2;     
+    required int32 student_count = 3;        
+    optional bytes state = 4;      
+    optional bytes title = 5;    
+    optional bytes creator_id = 6;           
+    repeated _voteOption options = 7;         
+    optional _voteResult result = 8;
+}
+
+
+
+message createVote_Request {
+    required bytes title = 1;  
+    required bool allow_multiple = 2;
+    required int32 student_count = 3;
+    repeated _voteOption options = 4;
+}
+message createVote_Response {
+    required int32 id = 1;     
+    required _voteInfo info = 2;
+}
+
+
+message endVote_Request {
+    required int32 id = 1;                   
+}
+message endVote_Response {
+    required int32 id = 1;      
+}
+
+
+message closeVote_Request {
+    required int32 id = 1; 
+}
+message closeVote_Response {
+    required int32 id = 1;      
+}
+
+
+message submitVote_Request {
+    required int32 id = 1;                   
+    repeated int32 option_ids = 2;           
+}
+
+message submitVote_Response {
+    required bool success = 1;               
+    optional bytes error_msg = 2;           
+}
+
+message queryVote_Request {
+    required int32 id = 1;                   
+    optional bool include_detail = 2;
+}
+message queryVote_Response {
+    optional _voteInfo info = 1;
+    repeated int32 option_ids = 2;
+}

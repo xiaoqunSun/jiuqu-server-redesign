@@ -1,0 +1,9 @@
+message heartbeat{
+	required int32 timestamp = 1;
+}
+message ping{
+	optional bytes timestamp = 1;
+}
+message pong{
+	optional bytes timestamp = 1;
+}
